@@ -36,10 +36,19 @@ pub struct Point { pub x: i32, pub y: i32 }
   (`C-CONV-TRAITS`, Item 5). Implement `From`, get `Into` for free.
 - Method-name cost conventions (`C-CONV`): `as_*` = cheap borrow, `to_*` =
   expensive/owned clone, `into_*` = consuming conversion.
+- **`AsRef` vs `Borrow` vs `Deref`** — pick deliberately: `AsRef<T>` is a cheap
+  reference conversion (`fn f<S: AsRef<str>>(s: S)`); `Borrow<T>` is `AsRef` *plus*
+  the guarantee that the borrowed form `Hash`/`Eq`/`Ord`-compares identically to the
+  owned form, which is exactly why `HashMap<String, _>::get` accepts `&str`; `Deref`
+  is for smart pointers only (see the Deref-polymorphism anti-pattern). Implement
+  `Borrow` only when that equality guarantee holds.
 - Iterator methods are named `iter` / `iter_mut` / `into_iter` (`C-ITER`), and the
   returned iterator type is named after them (`C-ITER-TY`).
 - Getters are `fn field(&self)` (no `get_` prefix), setters `set_field` (`C-GETTER`).
 - Casing follows RFC 430 (`C-CASE`): `CamelCase` types, `snake_case` values.
+- Don't encode types in names (Hungarian notation like `str_name`, `i_count`) — the
+  type system and editor tooling already show types, so the prefix is pure noise.
+  Name by meaning; use shadowing across transformations rather than `_typed` suffixes.
 
 ## Constructors, builders, and type-safe arguments
 
@@ -78,6 +87,27 @@ Choose deliberately (Item 12, `C-GENERIC`/`C-OBJECT`):
   copy of the code, heterogeneous collections (`Vec<Box<dyn Trait>>`). Cost: a
   vtable indirection; the trait must be object-safe.
 - Make a trait object-safe if it might ever be used as `dyn` (`C-OBJECT`).
+
+## Trait design notes
+
+Smaller, situational rules from the
+[Tour of Rust's Standard Library Traits](https://github.com/pretzelhammer/rust-blog/blob/master/posts/tour-of-rusts-standard-library-traits.md):
+
+- **Implement `IntoIterator` for `T`, `&T`, and `&mut T`** on a collection type, so
+  `for x in c`, `for x in &c`, and `for x in &mut c` all work (consuming, borrowing,
+  mutably borrowing).
+- **Operator traits: implement owned *and* borrowed forms** (`impl Add for Point`
+  *and* `impl Add for &Point`) or they silently diverge; delegate one to the other.
+  Note `AddAssign`/`*Assign` take `&mut self`, not `self`.
+- **`Cow<'a, T>`** lets an API defer the allocate-or-borrow choice to runtime —
+  return `Cow::Borrowed` on the common no-change path, `Cow::Owned` only when you
+  actually had to allocate.
+- **Blanket impls aren't overridable.** `impl<T> MyTrait for T` conflicts with any
+  later `impl MyTrait for Concrete` (coherence). Use a blanket impl only when you
+  truly want one behavior for a whole family — relevant when writing extension
+  traits (see [domain-modeling.md](domain-modeling.md)).
+- **`?Sized`** on a generic bound (`fn f<T: ?Sized>(t: &T)`) lets it accept
+  `&dyn Trait`, `&str`, `&[T]` — the implicit `Sized` bound otherwise excludes them.
 
 ## RAII guards
 

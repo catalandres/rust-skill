@@ -55,7 +55,8 @@ cargo test                      # behavior is preserved
 ```
 
 Clippy is the single most effective idiom teacher in the ecosystem — most rules
-in this skill are things clippy will flag. **Never silence a lint with `#[allow(...)]`
+in this skill are things clippy will flag (browse the full
+[lint list](https://rust-lang.github.io/rust-clippy/master/)). **Never silence a lint with `#[allow(...)]`
 to make it pass; fix the underlying code.** Only allow a lint when you can state
 why it's a deliberate false positive.
 
@@ -179,6 +180,24 @@ For deeper, situational guidance, load the matching file on demand:
   [references/beyond-std.md](references/beyond-std.md). Read it only when calling C
   / exposing a C ABI, or targeting environments without the standard library.
 
+## `unsafe` requires explicit human sign-off
+
+`unsafe` switches off the guarantees this entire skill is built on. Treat it as a
+last resort, never a convenience — and never a borrow-checker escape hatch.
+
+- **Never introduce `unsafe` on your own initiative.** If you believe it's truly
+  necessary, stop and ask the human. Ask **up to three times**, presenting the safe
+  alternative each time, before writing a single line of `unsafe`. Only proceed with
+  explicit human approval.
+- **In every code review, flag every line of `unsafe` as a warning** — call out each
+  `unsafe` block/fn explicitly, even when it looks correct, so a human always
+  re-examines it.
+
+Safe-isolation rules (and panic safety, `transmute`) live in
+[references/security.md](references/security.md); the
+[Rustonomicon](https://doc.rust-lang.org/nomicon/) is the reference *if* you must
+write it.
+
 ## Gotchas — Rust traps that defy reasonable assumptions
 
 - **`String::truncate` / slicing panics on a non-char-boundary.** `truncate("café", 4)`
@@ -202,6 +221,11 @@ For deeper, situational guidance, load the matching file on demand:
   `Vec` you own (`for i in 0..v.len() { v[i].clone() }`) when you could
   `into_iter()` and consume it; cloning output strings you could return as
   borrows with a lifetime. Reach for ownership/borrowing first, `.clone()` last.
+- **`Rc<RefCell<T>>` to dodge the borrow checker is a design smell.** Use it only
+  when you genuinely model shared ownership of mutable state. For dependency
+  wiring, prefer passing parameters/callbacks or returning a value the caller
+  applies — redesign to avoid long-lived shared mutable references.
+  ([Bad Habits](https://adventures.michaelfbryan.com/posts/rust-best-practices/bad-habits))
 - **Hand-written wire/format bytes drift.** Scattering `"+OK\r\n"` at every return
   site means one missing `\r\n` hangs a client. Give the reply a type and put the
   formatting in one `Display` impl.
@@ -214,6 +238,15 @@ For deeper, situational guidance, load the matching file on demand:
 - **Forcing UTF-8 on byte/OS data corrupts it.** Paths and external byte streams
   aren't guaranteed UTF-8; keep them as `&[u8]`/`Vec<u8>`/`OsStr` rather than
   `String::from_utf8_lossy` when fidelity matters.
+- **Integer overflow panics in debug but *silently wraps* in release.** When
+  operands can be large, use `checked_*` (→ `Option`), `saturating_*`, or
+  `wrapping_*` explicitly to say what you mean. ([Pitfalls of Safe Rust](https://corrode.dev/blog/pitfalls-of-safe-rust/))
+- **`as` casts truncate/overflow silently.** `300u32 as u8 == 44`. Use `TryFrom`/
+  `try_into` for narrowing conversions (it returns `Result`); reserve `as` for
+  known-safe widening.
+- **`Hash` and `Eq` must agree, and floats have neither.** Derive `Hash`, `Eq`,
+  `PartialEq` together — never one by hand. Types containing `f32`/`f64` can't be
+  `Eq`/`Hash` (NaN ≠ NaN), so they can't be `HashMap`/`HashSet` keys.
 
 ## Before you finish — checklist
 
@@ -226,6 +259,8 @@ For deeper, situational guidance, load the matching file on demand:
       reads more clearly
 - [ ] Invariants pushed into types where practical (newtypes, enums, parse-don't-validate)
 - [ ] No comments that merely restate the code; doc comments (`///`) on public items
+- [ ] No `unsafe` introduced without explicit human sign-off; any `unsafe` is
+      isolated, `// SAFETY:`-documented, and flagged as a warning in review
 
 ## Sources & further reading
 
@@ -235,7 +270,14 @@ For deeper, situational guidance, load the matching file on demand:
   [Thinking in Expressions](https://corrode.dev/blog/expressions/),
   [Defensive Programming](https://corrode.dev/blog/defensive-programming/),
   [Bugs Rust Won't Catch](https://corrode.dev/blog/bugs-rust-wont-catch/),
+  [Pitfalls of Safe Rust](https://corrode.dev/blog/pitfalls-of-safe-rust/),
   [Navigating Paradigms](https://corrode.dev/blog/paradigms/).
+- [Tour of Rust's Standard Library Traits](https://github.com/pretzelhammer/rust-blog/blob/master/posts/tour-of-rusts-standard-library-traits.md)
+  (pretzelhammer) — deep, practical reference on designing with std traits.
+- [Bad Habits](https://adventures.michaelfbryan.com/posts/rust-best-practices/bad-habits)
+  (Michael-F-Bryan) — common newbie habits and their idiomatic fixes.
+- [The Rustonomicon](https://doc.rust-lang.org/nomicon/) — the reference for writing
+  correct `unsafe` Rust (consult only when `unsafe` is unavoidable).
 - [mre/idiomatic-rust](https://github.com/mre/idiomatic-rust) — a peer-reviewed,
   continuously curated index of idiomatic-Rust articles, talks, and repos; the
   best single place to mine further patterns.

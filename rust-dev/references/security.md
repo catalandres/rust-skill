@@ -100,14 +100,27 @@ These untrusted-input traps live in SKILL.md gotchas and
 reintroduce the memory-safety bugs Rust exists to prevent. (Effective Rust Item 16;
 Rust Design Patterns "Contain unsafety in small modules".)
 
+> **Process rule:** never introduce `unsafe` on your own initiative — ask the human
+> up to three times (presenting the safe alternative each time) and proceed only
+> with explicit approval. In every review, flag every line of `unsafe` as a warning.
+> See the prominent rule in SKILL.md.
+
 - **Avoid it** unless you have a concrete reason (FFI, a proven performance need, a
-  primitive the safe API can't express). Most code never needs it.
+  primitive the safe API can't express). Most code never needs it. `unsafe` is
+  **not** a borrow-checker escape hatch — if it's fighting you, restructure the
+  code; don't reach for `unsafe` to silence it.
 - **Isolate it** in the smallest possible module/function, and wrap it in a safe
   API that upholds the invariants so callers can't misuse it.
 - **Document every block** with a `// SAFETY:` comment stating why it's sound, and
   put a `# Safety` section on every `unsafe fn` describing the caller's obligations.
 - **Test it hard:** run it under [Miri](https://github.com/rust-lang/miri) to catch
   undefined behavior, and consider fuzzing.
+- **Never `transmute`.** Reinterpreting bits with `mem::transmute` is almost always
+  a bug (wrong size/layout/lifetime). Use safe conversions (`From`/`as`/`to_*`); for
+  genuine byte-reinterpretation use `bytemuck` or `zerocopy`, not raw `transmute`.
+- **The reference:** if you must write `unsafe`, follow
+  [The Rustonomicon](https://doc.rust-lang.org/nomicon/) — especially its chapters
+  on uninitialized memory, data layout, and subtyping/variance.
 
 ## Checklist
 

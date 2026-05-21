@@ -170,6 +170,18 @@ let (oks, errs): (Vec<i32>, Vec<MyError>) = results.into_iter()
 (std's `Iterator::partition` works too, but leaves each side as `Result`s you must
 still unwrap.)
 
+## Panic safety
+
+A panic *unwinds* — it can fire partway through an operation (often inside a
+user-supplied closure) and abandon it mid-flight. Don't leave a data structure in a
+broken state across a point that might panic ([Rustonomicon: exception safety](https://doc.rust-lang.org/nomicon/exception-safety.html)):
+
+- Do the risky/foreign step (e.g. call the closure) *before* mutating shared state,
+  or stage changes and commit them only after it succeeds.
+- This is exactly why `std::sync::Mutex` *poisons* on a panic-while-locked: the data
+  may be inconsistent. Handle `lock()`'s `Result` (or use a non-poisoning lock like
+  `parking_lot`) deliberately rather than blindly `unwrap`-ing it.
+
 ## Checklist
 
 - [ ] No `unwrap()`/`panic!`/`expect()` on fallible paths in library code

@@ -25,11 +25,16 @@ fn parse_port(s: &str) -> Result<NonZeroU16, InvalidPort> {
 ```
 
 Once a function returns `NonZeroU16`, no caller can forget the port is non-zero —
-the type won't let them construct a zero. (Coined by Alexis King, "Parse, don't
-validate".)
+the type won't let them construct a zero. (Coined by Alexis King,
+["Parse, don't validate"](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/).)
 
 Do the parsing **once, at the boundary** (the edge of your program / module), and
 let everything inside work with the typed value.
+
+The same principle rejects the **init-then-populate** habit (`let c = Config::new();
+c.load(path)?;`), which leaves a window where the object exists but isn't valid.
+Return a fully-initialized, valid value straight from the constructor instead —
+`Config::from_file(path)?` — so an invalid instance can never be observed.
 
 ## 2. Make illegal states unrepresentable
 
@@ -115,6 +120,10 @@ impl FunStr for str {
 This is the pattern behind `itertools::Itertools`, `anyhow::Context`,
 `tokio::AsyncReadExt`, `rayon`'s parallel iterators. Use it to give call sites
 left-to-right method-chaining flow instead of inside-out nesting.
+
+Prefer one concrete `impl Trait for str` (or per type) over a blanket
+`impl<T> Trait for T`: a blanket impl can't be specialized later and conflicts
+with any other impl (coherence), so it locks you in.
 
 ## 6. Collapse parallel collections into one typed model
 
