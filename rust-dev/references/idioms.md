@@ -577,6 +577,64 @@ wire format lives in a single `Display` impl. (Full worked example:
 
 ---
 
+## Anti-patterns to avoid
+
+From the [Rust Design Patterns book](https://rust-unofficial.github.io/patterns/).
+
+### Cloning to satisfy the borrow checker
+
+Reaching for `.clone()` to silence a borrow error hides the real problem and
+desyncs two values that look related. Three honest options instead:
+
+- **Restructure** so borrows don't overlap (shorten a borrow's scope, split a
+  function, take `&` where you took `&mut`). This is the default.
+- **`mem::take` / `mem::replace`** to move a value out of a `&mut` without cloning,
+  leaving a default/placeholder behind:
+
+  ```rust
+  let owned = std::mem::take(&mut self.buffer);    // buffer now empty, owned is yours
+  let prev  = std::mem::replace(&mut self.state, State::Idle);
+  ```
+
+- **`Rc<T>` / `Arc<T>`** when you genuinely need shared ownership (clones are then
+  cheap refcount bumps, not deep copies).
+
+Cloning *for simplicity in a cold path* is fine (see "Keep it simple" in
+SKILL.md); cloning to *dodge* the borrow checker on a hot or central path is the
+smell.
+
+### Deref polymorphism
+
+Implementing `Deref` to make a wrapper "inherit" the inner type's methods fakes
+inheritance and surprises readers — trait bounds don't transfer, `self` is the
+wrong type, and it only works one level deep. Use real composition: implement the
+traits you want, write thin facade methods, or use a delegation crate (`delegate`,
+`ambassador`). Only smart pointers should implement `Deref`.
+
+### `#![deny(warnings)]` in source
+
+Don't bake it into the crate — it breaks your build whenever a new compiler
+version adds a lint or deprecates an API. Enforce `-D warnings` in CI instead (see
+the validation loop in SKILL.md).
+
+---
+
+## GoF patterns map to Rust-native constructs
+
+You rarely need the classic OO pattern names in Rust — the language gives you the
+mechanism directly:
+
+- **Command** → an `enum` of operations + a `match` dispatcher (exactly catalog
+  #27, mini-redis).
+- **Strategy** → pass a closure, or a `&dyn Trait` / generic `impl Trait`.
+- **Visitor / Fold** → a trait with a method per node type, or an iterator +
+  `fold`/`map`.
+- **Interpreter** → an `enum` AST + a recursive `eval` over `match`.
+
+Reach for the construct, not the ceremony.
+
+---
+
 ## The meta-lessons
 
 1. **Loops and nested matches are usually combinators in disguise.** Reach for

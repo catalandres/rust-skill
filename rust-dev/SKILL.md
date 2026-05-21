@@ -33,6 +33,9 @@ well; add abstraction only when a concrete second use case forces it.
   Profile before optimizing — elegant code is easier to make fast than the reverse.
 - Keep the common-case API obvious; push advanced knobs out of the default path.
 - If a type's doc comment needs to say "X **and** Y", it probably does too much.
+- Prefer functions and generics over macros. Reach for a `macro_rules!` or
+  proc-macro only when there's genuinely no other way — macros are harder to read,
+  document, and debug.
 - Rust is multi-paradigm: functional pipelines for data transforms, plain
   imperative code for hot or hardware-level paths, structs/enums + traits
   (composition, not inheritance) for structure. Pick per situation.
@@ -63,9 +66,18 @@ For stricter, defensive codebases, opt into extra lints (`warn` or `deny`):
 [references/domain-modeling.md](references/domain-modeling.md) for what each buys
 you ([Defensive Programming](https://corrode.dev/blog/defensive-programming/)).
 
+Enforce `-D warnings` in **CI** (e.g. `RUSTFLAGS="-D warnings"`), not by baking
+`#![deny(warnings)]` into crate source — a source-level deny breaks the build
+whenever a new compiler version adds a lint or deprecates an API
+([anti-pattern](https://rust-unofficial.github.io/patterns/anti_patterns/deny-warnings.html)).
+
 When refactoring, the test suite is your safety net: refactors must not change
 behavior. If tests don't exist for the code you're changing, add characterization
 tests *first*, then refactor.
+
+`cargo test` also runs doc-tests: the `///` examples on your public API are
+compiled and executed, so they double as documentation that can't go stale (write
+more than unit tests — Effective Rust Item 30).
 
 ## Universal rules — reach for these constantly
 
@@ -149,10 +161,23 @@ For deeper, situational guidance, load the matching file on demand:
   function takes several `bool`s/strings, when "config" or "command" is modeled
   as a stringly-typed map, or when you're tempted to validate the same value
   repeatedly.
-- **Filesystem races, privilege boundaries, untrusted-input safety** →
+- **Filesystem races, privilege boundaries, untrusted-input safety, `unsafe`** →
   [references/security.md](references/security.md). Read it when code touches the
-  filesystem with attacker-influenced paths, runs with elevated privileges, or
-  parses untrusted input/bytes — Rust's memory safety does *not* cover these.
+  filesystem with attacker-influenced paths, runs with elevated privileges,
+  parses untrusted input/bytes, or uses `unsafe` — Rust's memory safety does *not*
+  cover these.
+- **Public API / library / crate design** →
+  [references/api-design.md](references/api-design.md). Read it when designing a
+  public API or publishing a crate: which traits to derive, naming and conversion
+  conventions, builders, generics vs trait objects, future-proofing, and
+  dependency hygiene.
+- **Async, threads, and shared state** →
+  [references/async-concurrency.md](references/async-concurrency.md). Read it when
+  code uses `async`/`await`, spawns threads, or shares mutable state — blocking the
+  runtime, deadlocks, and cancellation bugs aren't caught by the compiler.
+- **FFI (C interop) and `no_std`/embedded** →
+  [references/beyond-std.md](references/beyond-std.md). Read it only when calling C
+  / exposing a C ABI, or targeting environments without the standard library.
 
 ## Gotchas — Rust traps that defy reasonable assumptions
 
@@ -214,3 +239,14 @@ For deeper, situational guidance, load the matching file on demand:
 - [mre/idiomatic-rust](https://github.com/mre/idiomatic-rust) — a peer-reviewed,
   continuously curated index of idiomatic-Rust articles, talks, and repos; the
   best single place to mine further patterns.
+- [Rust Design Patterns](https://rust-unofficial.github.io/patterns/) — community
+  catalogue of idioms, design patterns, and anti-patterns.
+- [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/checklist.html)
+  — the official library-design checklist.
+- [Effective Rust](https://www.lurklurk.org/effective-rust/) — David Drysdale's 35
+  items for writing better Rust (free online).
+- Books: *Programming Rust* (Blandy, Orendorff, Tindall);
+  [*Rust for Rustaceans*](https://rust-for-rustaceans.com/) (Gjengset);
+  [*Rust Atomics and Locks*](https://marabos.nl/atomics/) (Bos, free online);
+  [*Rust Cookbook*](https://rust-lang-nursery.github.io/rust-cookbook/);
+  [*Elements of Rust*](https://github.com/ferrous-systems/elements-of-rust).

@@ -94,6 +94,21 @@ These untrusted-input traps live in SKILL.md gotchas and
   security-relevant operations — a missed failure is a missed access check.
 - Don't force UTF-8 on paths/byte streams; keep `&[u8]`/`OsStr` fidelity.
 
+## Contain `unsafe`
+
+`unsafe` turns off the compiler's safety checks — a single wrong `unsafe` block can
+reintroduce the memory-safety bugs Rust exists to prevent. (Effective Rust Item 16;
+Rust Design Patterns "Contain unsafety in small modules".)
+
+- **Avoid it** unless you have a concrete reason (FFI, a proven performance need, a
+  primitive the safe API can't express). Most code never needs it.
+- **Isolate it** in the smallest possible module/function, and wrap it in a safe
+  API that upholds the invariants so callers can't misuse it.
+- **Document every block** with a `// SAFETY:` comment stating why it's sound, and
+  put a `# Safety` section on every `unsafe fn` describing the caller's obligations.
+- **Test it hard:** run it under [Miri](https://github.com/rust-lang/miri) to catch
+  undefined behavior, and consider fuzzing.
+
 ## Checklist
 
 - [ ] No check-then-use on attacker-influenced paths; use `create_new`, or
@@ -104,3 +119,5 @@ These untrusted-input traps live in SKILL.md gotchas and
 - [ ] No panics or discarded errors on untrusted-input or access-control paths
 - [ ] Untrusted input parsed into a validated type at the boundary, not re-checked
       everywhere
+- [ ] `unsafe` avoided where possible; otherwise isolated, `// SAFETY:`-documented,
+      and tested under Miri

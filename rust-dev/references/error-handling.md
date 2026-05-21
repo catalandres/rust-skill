@@ -154,7 +154,21 @@ let nums: Result<Vec<i32>, _> = strings.iter().map(|s| s.parse()).collect();
 ```
 
 To instead keep the successes and ignore failures, use `filter_map(Result::ok)`.
-To partition into oks and errs, `partition` or `partition_map` (itertools).
+
+To keep *both* sides — process the oks and report the errs — partition them.
+`itertools::partition_map` does it in one pass with the values already unwrapped:
+
+```rust
+use itertools::{Itertools, Either};
+let (oks, errs): (Vec<i32>, Vec<MyError>) = results.into_iter()
+    .partition_map(|r| match r {
+        Ok(v)  => Either::Left(v),
+        Err(e) => Either::Right(e),
+    });
+```
+
+(std's `Iterator::partition` works too, but leaves each side as `Result`s you must
+still unwrap.)
 
 ## Checklist
 
