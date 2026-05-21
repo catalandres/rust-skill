@@ -1,13 +1,15 @@
 ---
 name: rust-dev
 description: >
-  Write, refactor, and review idiomatic, maintainable Rust. Apply Rust idioms —
-  Option/Result combinators, iterator pipelines instead of manual loops, the `?`
-  operator, FromStr/TryFrom parsers, custom error enums, newtypes, and "make
-  illegal states unrepresentable" — and run fmt/clippy/test before finishing.
-  Use whenever writing new Rust, cleaning up awkward or verbose Rust, fixing
-  ownership/borrowing or error-handling smells, or reviewing a Rust diff — even
-  if the user never says "idiomatic" or names a specific pattern.
+  Write, refactor, AND review idiomatic, maintainable Rust. When generating or
+  changing Rust, apply its idioms — Option/Result combinators, iterator pipelines
+  over manual loops, the `?` operator, FromStr/TryFrom parsers, custom error enums,
+  newtypes, and "make illegal states unrepresentable" — and run fmt/clippy/test
+  before finishing. When reviewing Rust, check for those same idioms plus the
+  gotchas and anti-patterns and flag every line of `unsafe`. Use whenever writing
+  new Rust, cleaning up awkward or verbose Rust, fixing ownership/borrowing or
+  error-handling smells, or reviewing/auditing a Rust file, diff, or PR — even if
+  the user never says "idiomatic" or names a specific pattern.
 license: MIT
 metadata:
   source: Distilled from corrode/refactoring-rust (Matthias Endler) + Agent Skills best practices
@@ -79,6 +81,28 @@ tests *first*, then refactor.
 `cargo test` also runs doc-tests: the `///` examples on your public API are
 compiled and executed, so they double as documentation that can't go stale (write
 more than unit tests — Effective Rust Item 30).
+
+## Two modes: generating and reviewing
+
+This skill is for both writing/refactoring Rust **and** reviewing it. Everything
+below (rules, gotchas, anti-patterns, references) serves both — the difference is
+how you apply it.
+
+When **reviewing** a file, diff, or PR:
+
+1. Run the validation loop against the change (fmt, clippy `-D warnings`, tests) and
+   report anything it flags.
+2. Scan the diff against the **Gotchas** section below and the **anti-patterns** in
+   [references/idioms.md](references/idioms.md): manual loops that should be
+   combinators, `&Option<T>`/`&Vec<T>` params, `unwrap`/discarded errors on fallible
+   paths, bool-soup signatures, silent `as` casts or overflow, clone-to-dodge-the-
+   borrow-checker, stringly-typed data that should be parsed into types.
+3. **Flag every line of `unsafe` as a warning**, even when it looks correct.
+4. Check the change against the "Before you finish" checklist.
+
+Report each finding as **severity** (blocker / should-fix / nit) · location · the
+problem · the idiomatic fix (a one-line before→after). Lead with blockers; don't
+bury a real bug under style nits.
 
 ## Universal rules — reach for these constantly
 
